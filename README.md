@@ -3,6 +3,10 @@
 ## 📌 Project Overview
 [cite_start]A decentralized framework for precision agriculture using **Ethereum smart contracts** and **IoT technology**[cite: 28, 29].
 
+## 🚀 Visual Demo
+![AgroChain Dashboard](./agrochain dashboard.pdf)
+*Figure 1: Real-time Web3 dashboard showing IoT telemetry and AI yield predictions.*
+
 ## 🚀 Key Features
 * [cite_start]**Immutable Data**: Implemented **Solidity** smart contracts on **Ganache** to record non-manipulable sensor data[cite: 28, 30].
 * [cite_start]**Web3 Dashboard**: Built a real-time interface for batch tracking and **AI-driven harvest yield prediction**[cite: 31].
