@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AgroChain Gold | AI & Energy Efficient Blockchain</title>
+    
+    <script src="https://cdn.jsdelivr.net/npm/web3@1.5.2/dist/web3.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root { --primary: #1b4332; --secondary: #2d6a4f; --accent: #ff9f1c; --bg: #f0f2f5; --white: #ffffff; }
+        body { font-family: 'Segoe UI', sans-serif; background-color: var(--bg); margin: 0; }
+        .navbar { background: linear-gradient(135deg, var(--primary), var(--secondary)); color: white; padding: 1rem 5%; display: flex; justify-content: space-between; align-items: center; box-shadow: 0 2px 10px rgba(0,0,0,0.2); }
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 20px; }
+        .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; margin-bottom: 30px; }
+        .stat-card { background: var(--white); padding: 20px; border-radius: 12px; text-align: center; box-shadow: 0 4px 6px rgba(0,0,0,0.05); border-bottom: 4px solid var(--accent); }
+        .stat-card h2 { font-size: 2rem; margin: 10px 0; color: var(--primary); }
+        .main-grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr; gap: 20px; margin-bottom: 30px; }
+        .card { background: var(--white); border-radius: 12px; padding: 20px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .search-box { width: 100%; padding: 12px; margin-bottom: 15px; border-radius: 8px; border: 1px solid var(--accent); box-sizing: border-box; font-size: 1rem; outline: none; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; }
+        #qrcode { margin: 15px auto; display: flex; justify-content: center; min-height: 120px; }
+        .badge-irrigation { background: #fee2e2; color: #dc2626; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 0.7rem; }
+        .badge-verified { background: #dcfce7; color: #166534; padding: 5px 10px; border-radius: 20px; font-weight: bold; font-size: 0.7rem; }
+        .btn-download { background: var(--accent); color: white; border: none; padding: 12px; border-radius: 8px; cursor: pointer; font-weight: bold; width: 100%; margin-top: 10px; }
+        .highlight-row { background-color: #fff9db !important; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<nav class="navbar">
+    <h1>🌾 AgroChain Gold <small style="font-size: 0.5em;">v2.5</small></h1>
+    <div><span style="color: #4ade80;">●</span> System Secured by Blockchain</div>
+</nav>
+
+<div class="container">
+    <div class="stats-row">
+        <div class="stat-card"><span>Moisture</span><h2 id="curr-moisture">--%</h2></div>
+        <div class="stat-card"><span>Temp (Nitrogen)</span><h2 id="curr-temp">--°C</h2></div>
+        <div class="stat-card"><span>Ledger Blocks</span><h2 id="total-blocks">--</h2></div>
+        <div class="stat-card"><span>Node Battery</span><h2 id="battery-level">100%</h2></div>
+    </div>
+
+    <div class="main-grid">
+        <div class="card">
+            <h3>📈 Environmental Trends</h3>
+            <canvas id="moistureChart" height="150"></canvas>
+        </div>
+
+        <div class="card" style="border-top: 5px solid #ff9f1c;">
+            <h3>🤖 AI Predictive Insights</h3>
+            <div style="margin-top: 15px;">
+                <p><strong>Health:</strong> <span id="ai-health">Analyzing...</span></p>
+                <p><strong>Yield Prediction:</strong> <span id="ai-yield">--</span></p>
+                <p><strong>System Advice:</strong> <br><small id="ai-advice" style="color:#666">Analyzing ledger history...</small></p>
+            </div>
+        </div>
+
+        <div class="card" style="text-align: center;">
+            <h3>🔒 Authenticator</h3>
+            <div id="qrcode"></div>
+            <button class="btn-download" onclick="exportToCSV()">📥 DOWNLOAD AUDIT LOG</button>
+        </div>
+    </div>
+
+    <div class="card">
+        <h3>📜 Traceability Ledger</h3>
+        <input type="text" id="search-input" class="search-box" placeholder="🔍 Enter Batch ID to search Blockchain history..." onkeyup="handleSearch()">
+        <table id="data-table">
+            <thead><tr><th>Batch ID</th><th>Time</th><th>Moisture</th><th>Temp</th><th>Status</th></tr></thead>
+            <tbody></tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    const ganacheUrl = "http://127.0.0.1:7545"; 
+    const contractAddress = "0xDFb2618DaAf55DD95638924cfA5f18698C653c83";
+    
+    const abi = [
+        {
+            "inputs": [],
+            "name": "batchCount",
+            "outputs": [{"internalType": "uint256", "name": "", "type": "uint256"}],
+            "stateMutability": "view",
+            "type": "function"
+        },
+        {
+            "inputs": [{"internalType": "uint256", "name": "_batchId", "type": "uint256"}],
+            "name": "getBatch",
+            "outputs": [{
+                "components": [
+                    {"name": "timestamp", "type": "uint256"},
+                    {"name": "moisture", "type": "uint256"},
+                    {"name": "nitrogen", "type": "uint256"},
+                    {"name": "phosphorus", "type": "uint256"},
+                    {"name": "potassium", "type": "uint256"},
+                    {"name": "status", "type": "string"}
+                ],
+                "type": "tuple"
+            }],
+            "stateMutability": "view",
+            "type": "function"
+        }
+    ];
+
+    let web3 = new Web3(new Web3.providers.HttpProvider(ganacheUrl));
+    let contract = new web3.eth.Contract(abi, contractAddress);
+    let moistureChart;
+
+    function initChart() {
+        const ctx = document.getElementById('moistureChart').getContext('2d');
+        moistureChart = new Chart(ctx, {
+            type: 'line',
+            data: { labels: [], datasets: [{ label: 'Moisture %', data: [], borderColor: '#2d6a4f', backgroundColor: 'rgba(45,106,79,0.1)', fill: true, tension: 0.4 }] },
+            options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+        });
+    }
+
+    async function updateDashboard() {
+        // Prevent background refresh while user is typing in search
+        if (document.getElementById("search-input").value.trim() !== "") return;
+
+        try {
+            const countResponse = await contract.methods.batchCount().call();
+            const count = parseInt(countResponse);
+            
+            document.getElementById('total-blocks').innerText = count;
+            document.getElementById('battery-level').innerText = (100 - (count * 0.01)).toFixed(2) + "%";
+
+            if (count > 0) {
+                const tableBody = document.querySelector("#data-table tbody");
+                let labels = [], dataPoints = [], htmlRows = "";
+
+                // Fetch all batches to populate the searchable table
+                for (let i = 1; i <= count; i++) {
+                    const res = await contract.methods.getBatch(i).call();
+                    const time = new Date(Number(res.timestamp) * 1000).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+                    
+                    labels.push(time); 
+                    dataPoints.push(Number(res.moisture));
+
+                    let badge = Number(res.moisture) < 30 ? 
+                        `<span class="badge-irrigation">IRRIGATION ON</span>` : 
+                        `<span class="badge-verified">VERIFIED</span>`;
+
+                    // Newest data at the top
+                    htmlRows = `<tr><td>#${i}</td><td>${time}</td><td>${res.moisture}%</td><td>${res.nitrogen}°C</td><td>${badge}</td></tr>` + htmlRows;
+
+                    // Update Top Stats and QR Code for the Latest Batch only
+                    if (i === count) {
+                        document.getElementById('curr-moisture').innerText = res.moisture + "%";
+                        document.getElementById('curr-temp').innerText = res.nitrogen + "°C";
+                        
+                        const m = Number(res.moisture);
+                        document.getElementById('ai-health').innerText = m >= 40 ? "🟢 Excellent" : "🔴 Water Stress";
+                        document.getElementById('ai-yield').innerText = m >= 40 ? "92-98%" : "65-70%";
+                        document.getElementById('ai-advice').innerText = m < 40 ? "Recommended: Activate irrigation system for Batch #" + i : "System stable. No action required.";
+                        
+                        // Detailed QR Code
+                        const qrContainer = document.getElementById("qrcode");
+                        qrContainer.innerHTML = ""; 
+                        const qrContent = `AGROCHAIN BATCH REPORT\nBatch ID : #${i}\nMoisture : ${res.moisture}%\nTemp : ${res.nitrogen}C\nBLOCKCHAIN VERIFIED`;
+                        new QRCode(qrContainer, { 
+                            text: qrContent, 
+                            width: 128, 
+                            height: 128,
+                            colorDark : "#1b4332",
+                            colorLight : "#ffffff"
+                        });
+                    }
+                }
+                tableBody.innerHTML = htmlRows;
+                moistureChart.data.labels = labels; 
+                moistureChart.data.datasets[0].data = dataPoints; 
+                moistureChart.update();
+            }
+        } catch (e) {
+            console.error("Dashboard Sync Error:", e);
+        }
+    }
+
+    // SEARCH FUNCTIONALITY
+    function handleSearch() {
+        const input = document.getElementById("search-input").value.toUpperCase();
+        const table = document.getElementById("data-table");
+        const tr = table.getElementsByTagName("tr");
+
+        for (let i = 1; i < tr.length; i++) {
+            const td = tr[i].getElementsByTagName("td")[0]; // Column 0 is Batch ID
+            if (td) {
+                const txtValue = td.textContent || td.innerText;
+                if (txtValue.toUpperCase().indexOf(input) > -1) {
+                    tr[i].style.display = "";
+                    if (input !== "") tr[i].classList.add("highlight-row");
+                    else tr[i].classList.remove("highlight-row");
+                } else {
+                    tr[i].style.display = "none";
+                }
+            }
+        }
+    }
+
+    // EXPORT TO CSV FUNCTIONALITY
+    function exportToCSV() {
+        let csv = "Batch ID,Time,Moisture,Temp,Status\n";
+        const rows = document.querySelectorAll("#data-table tr");
+        
+        for (let i = 1; i < rows.length; i++) {
+            const cols = rows[i].querySelectorAll("td");
+            let rowData = [];
+            for (let j = 0; j < cols.length; j++) {
+                rowData.push(cols[j].innerText.replace(/,/g, ""));
+            }
+            csv += rowData.join(",") + "\n";
+        }
+
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', `AgroChain_Audit_Log_${new Date().getTime()}.csv`);
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    }
+
+    // STARTUP
+    window.addEventListener('load', () => {
+        initChart();
+        updateDashboard();
+        // Auto-refresh every 5 seconds unless searching
+        setInterval(() => {
+            const searchBox = document.getElementById("search-input");
+            if (searchBox.value.trim() === "") {
+                updateDashboard();
+            }
+        }, 5000);
+    });
+</script>
+</body>
+</html>
